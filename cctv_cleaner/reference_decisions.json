@@ -1,0 +1,62 @@
+{
+  "599/20260830_072056": {
+    "example": 1,
+    "decision": "keep",
+    "note": "Overall user decision; vehicle/pedestrian usability not separately assessed."
+  },
+  "1060/20260831_194624": {
+    "example": 2,
+    "decision": "adjust",
+    "note": "Overall user decision; vehicle/pedestrian usability not separately assessed."
+  },
+  "126/20260829_151000": {
+    "example": 3,
+    "decision": "adjust",
+    "note": "Overall user decision; vehicle/pedestrian usability not separately assessed."
+  },
+  "233/20260829_153014": {
+    "example": 4,
+    "decision": "keep",
+    "note": "Overall user decision; vehicle/pedestrian usability not separately assessed."
+  },
+  "169/20260830_100117": {
+    "example": 5,
+    "decision": "drop",
+    "note": "Overall user decision; vehicle/pedestrian usability not separately assessed."
+  },
+  "139/20260830_084116": {
+    "example": 6,
+    "decision": "drop",
+    "note": "Overall user decision; vehicle/pedestrian usability not separately assessed."
+  },
+  "118/20260830_154100": {
+    "example": 7,
+    "decision": "drop",
+    "note": "Overall user decision; vehicle/pedestrian usability not separately assessed."
+  },
+  "18/20260827_194057": {
+    "example": 8,
+    "decision": "drop",
+    "note": "Overall user decision; vehicle/pedestrian usability not separately assessed."
+  },
+  "239/20260827_114604": {
+    "example": 9,
+    "decision": "keep",
+    "note": "Overall user decision; vehicle/pedestrian usability not separately assessed."
+  },
+  "1804/20260827_105531": {
+    "example": 10,
+    "decision": "keep",
+    "note": "Overall user decision; vehicle/pedestrian usability not separately assessed."
+  },
+  "370/20260829_194538": {
+    "example": 11,
+    "decision": "keep",
+    "note": "Overall user decision; vehicle/pedestrian usability not separately assessed."
+  },
+  "1815/20260825_102543": {
+    "example": 12,
+    "decision": "keep",
+    "note": "Overall user decision; vehicle/pedestrian usability not separately assessed."
+  }
+}

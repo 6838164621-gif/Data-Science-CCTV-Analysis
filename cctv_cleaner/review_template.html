@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CCTV cleaning review</title>
+<style>
+body{font:16px system-ui,sans-serif;background:#f3f5f7;color:#172536;margin:0}header{padding:22px 5%;background:#fff;border-bottom:1px solid #ccd4de;position:sticky;top:0;z-index:1}h1{font-size:24px;margin:0 0 8px}p{line-height:1.5;margin:8px 0}button,select{font:inherit;padding:8px;border:1px solid #9cabb9;border-radius:5px;background:white}button{cursor:pointer;background:#163f68;color:white;margin:5px 8px 0 0}main{max-width:1120px;margin:auto;padding:20px}article{background:white;border:1px solid #d8dfe6;border-radius:10px;margin:0 0 22px;padding:20px}h2{font-size:19px;margin:0 0 8px}.images{display:flex;gap:18px;flex-wrap:wrap}figure{margin:12px 0}img{display:block;max-width:100%;width:auto;height:auto}figcaption{font-weight:600;margin-bottom:8px}.fields{display:flex;gap:16px;flex-wrap:wrap}label{display:grid;gap:6px;margin:10px 0}.small{font-size:13px;color:#52616f;overflow-wrap:anywhere}.status{font-weight:600}.hidden{display:none!important}
+</style>
+<style>img{border:1px solid #aab6c3;box-sizing:border-box}figure{background:#f7f9fb;padding:8px}figcaption{max-width:480px}</style>
+<header><h1>CCTV image cleaning review</h1>
+<p id="summary"></p><p>Judge whether the road and pedestrian areas remain interpretable. Brightness or blur flags are suggestions.</p>
+<button id="download">Download decisions</button><button id="import">Import previous decisions</button><input type="file" accept=".json" id="file" hidden>
+<label style="display:inline-block">Show <select id="filter"><option value="all">All examples</option><option value="review">Pending review</option><option value="reference">Your reference examples</option></select></label>
+<p class="small" id="saveStatus">Download decisions to save your choices. No images are changed on this page.</p>
+</header><main id="cards"></main>
+<script>
+const data=/*DATA*/null;
+const edits=new Map();
+const elements=new Map();
+function text(tag,value,parent,cls){const n=document.createElement(tag);n.textContent=value;if(cls)n.className=cls;parent.appendChild(n);return n;}
+function field(parent,title,values,value,changed){const label=text('label',title,parent);const select=document.createElement('select');for(const [key,caption] of values){const option=document.createElement('option');option.value=key;option.textContent=caption;select.appendChild(option);}select.value=value;select.addEventListener('change',()=>changed(select.value));label.appendChild(select);return select;}
+document.getElementById('summary').textContent=`Showing ${data.cards.length} examples from ${data.total.toLocaleString()} screened images. This page is a sample, not the entire dataset.`;
+for(const card of data.cards){
+ const article=document.createElement('article');document.getElementById('cards').appendChild(article);
+ text('h2',`Camera ${card.camera}${card.example?' · Reference '+card.example:''} · ${card.key||''}`,article);
+ text('p',card.flags.length?`Flags: ${card.flags.join(', ')}`:'No measurement flags',article,'small');
+ text('p',`Initial decision: ${card.decision} (${card.decision_origin}). Vehicle and pedestrian suitability have not been confirmed separately.`,article,'small');
+ const images=document.createElement('div');images.className='images';article.appendChild(images);
+ for(const [label,url] of [['Original',card.before],['Local contrast preview · CLAHE',card.after]]){const figure=document.createElement('figure');images.appendChild(figure);text('figcaption',label+(card.flags.includes('uniform_frame')?' · Uniform frame: no scene detail':''),figure);const img=document.createElement('img');img.src=url;img.alt=label;img.loading='lazy';figure.appendChild(img);}
+ const fields=document.createElement('div');fields.className='fields';article.appendChild(fields);
+ const edit={path:card.path,decision:card.decision,vehicle_usability:card.vehicle_usability,pedestrian_usability:card.pedestrian_usability};
+ function changed(key,value){edit[key]=value;edits.set(card.path,{...edit});document.getElementById('saveStatus').textContent=`${edits.size} reviewed examples. Download decisions before closing.`;filter();}
+ const decision=field(fields,'Overall decision',[['keep','Keep original'],['adjust','Keep CLAHE version'],['drop','Drop'],['review','Needs review']],edit.decision,v=>changed('decision',v));
+ const usable=[['unassessed','Not assessed'],['usable','Usable'],['unusable','Unusable']];
+ const vehicle=field(fields,'Vehicle density',usable,edit.vehicle_usability,v=>changed('vehicle_usability',v));
+ const pedestrian=field(fields,'Pedestrian density',usable,edit.pedestrian_usability,v=>changed('pedestrian_usability',v));
+ const confirm=document.createElement('button');confirm.textContent='Confirm current choice';confirm.onclick=()=>{changed('decision',edit.decision);confirm.textContent='Choice recorded';};article.appendChild(confirm);
+ text('p',card.path,article,'small');elements.set(card.path,{article,card,edit,decision,vehicle,pedestrian});
+}
+function filter(){const f=document.getElementById('filter').value;for(const e of elements.values()){e.article.classList.toggle('hidden',(f==='review'&&e.edit.decision!=='review')||(f==='reference'&&!e.card.example));}}
+document.getElementById('filter').onchange=filter;
+document.getElementById('download').onclick=()=>{const payload={schema_version:1,source:data.source,decisions:[...edits.values()]};const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='review_decisions.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);document.getElementById('saveStatus').textContent=`Downloaded ${edits.size} decisions. Keep this file for the apply step.`;};
+document.getElementById('import').onclick=()=>document.getElementById('file').click();
+document.getElementById('file').onchange=async event=>{try{const imported=JSON.parse(await event.target.files[0].text());if(imported.source!==data.source)throw Error('Different source dataset');for(const edit of imported.decisions){if(!['keep','adjust','drop','review'].includes(edit.decision))throw Error('Invalid decision');for(const key of ['vehicle_usability','pedestrian_usability'])if(!['unassessed','usable','unusable'].includes(edit[key]||'unassessed'))throw Error('Invalid usability');edits.set(edit.path,edit);const e=elements.get(edit.path);if(e){Object.assign(e.edit,edit);e.decision.value=edit.decision;e.vehicle.value=edit.vehicle_usability||'unassessed';e.pedestrian.value=edit.pedestrian_usability||'unassessed';}}filter();document.getElementById('saveStatus').textContent=`Imported ${edits.size} decisions, including choices from other batches.`;}catch(error){alert('Could not import: '+error.message);}event.target.value='';};
+</script></html>
