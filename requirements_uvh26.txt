@@ -1,0 +1,6 @@
+streamlit
+pandas
+pillow
+huggingface_hub
+ultralytics
+sahi
