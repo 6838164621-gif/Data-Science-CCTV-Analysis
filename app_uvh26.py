@@ -16,6 +16,7 @@ MODEL_PATH = MODEL_DIR / "UVH-26-MV-YOLOv11-S.pt"
 PERSON_MODEL_PATH = ROOT / "yolo11x.pt"
 SEGFORMER_DIR = ROOT / "segformer_no_sidewalk_training" / "model"
 LABELME_DIR = ROOT / "Data" / "Labelme workflow" / "drafts"
+BOTTOM_UNKNOWN_RATIO = 0.05
 CLASS_FILE = MODEL_DIR / "uvh_classes.txt"
 
 GROUPS = {
@@ -105,11 +106,66 @@ def point_region(detection, region_mask):
     x1, y1, x2, y2 = detection["box"]
     x = max(0, min(region_mask.shape[1] - 1, int((x1 + x2) / 2)))
     y = max(0, min(region_mask.shape[0] - 1, int(y2)))
+    # LabelMe polygons may stop just above the bottom screen edge. Look upward
+    # in a narrow vertical band before falling back to the sampled mask value.
+    if y >= int(region_mask.shape[0] * (1 - BOTTOM_UNKNOWN_RATIO)):
+        band_width = max(1, int(region_mask.shape[1] * 0.02))
+        y_start = max(0, y - int(region_mask.shape[0] * 0.20))
+        nearby = region_mask[y_start:y + 1, max(0, x - band_width):min(region_mask.shape[1], x + band_width + 1)]
+        labeled = nearby[nearby > 0]
+        if labeled.size:
+            values, counts = __import__("numpy").unique(labeled, return_counts=True)
+            return int(values[counts.argmax()])
     return int(region_mask[y, x])
+
+
+def pedestrian_region(detection, region_mask):
+    """Use several lower-body points to avoid one-pixel polygon-boundary errors."""
+    x1, y1, x2, y2 = detection["box"]
+    width, height = region_mask.shape[1], region_mask.shape[0]
+    samples = []
+    for x_ratio in (0.25, 0.50, 0.75):
+        x = max(0, min(width - 1, int(x1 + (x2 - x1) * x_ratio)))
+        for y_ratio in (0.65, 0.78, 0.90):
+            y = max(0, min(height - 1, int(y1 + (y2 - y1) * y_ratio)))
+            samples.append(int(region_mask[y, x]))
+    if not samples:
+        return -1
+    counts = {region: samples.count(region) for region in set(samples)}
+    # Road-related labels take priority when the lower-body samples straddle
+    # a slightly imperfect polygon boundary.
+    road_votes = sum(counts.get(region, 0) for region in (1, 2, 3))
+    if road_votes >= max(1, len(samples) // 3):
+        return 1
+    return max(counts, key=counts.get)
 
 
 def overlaps_detection(first, second, threshold=0.15):
     return box_iou(first["box"], second["box"]) >= threshold
+
+
+def remove_containing_boxes(detections):
+    """Remove oversized boxes that contain other distinct vehicle boxes."""
+    remove = set()
+    for index, outer in enumerate(detections):
+        ox1, oy1, ox2, oy2 = outer["box"]
+        outer_area = max(1.0, (ox2 - ox1) * (oy2 - oy1))
+        contained_count = 0
+        for other_index, inner in enumerate(detections):
+            if index == other_index:
+                continue
+            ix1, iy1, ix2, iy2 = inner["box"]
+            inner_area = max(1.0, (ix2 - ix1) * (iy2 - iy1))
+            if inner_area >= outer_area:
+                continue
+            intersection = max(0, min(ox2, ix2) - max(ox1, ix1)) * max(0, min(oy2, iy2) - max(oy1, iy1))
+            if intersection / inner_area >= 0.75:
+                contained_count += 1
+        # A box containing multiple smaller detections is almost certainly an
+        # oversized duplicate rather than one vehicle containing other cars.
+        if contained_count >= 2:
+            remove.add(index)
+    return [item for index, item in enumerate(detections) if index not in remove]
 
 
 @st.cache_data
@@ -180,7 +236,7 @@ def prepare_detections(result, image_size, nested_overlap, allowed_classes=None)
                 break
         if not duplicate:
             kept.append(candidate)
-    return kept
+    return remove_containing_boxes(kept)
 
 
 def prepare_sahi_detections(sliced_result, image_size, nested_overlap, allowed_classes=None):
@@ -242,7 +298,7 @@ def prepare_sahi_detections(sliced_result, image_size, nested_overlap, allowed_c
                 break
         if not duplicate:
             kept.append(candidate)
-    return kept
+    return remove_containing_boxes(kept)
 
 
 def transparent_overlay(image, detections, show_grouped):
@@ -362,23 +418,37 @@ with st.spinner(f"Running {'combined region analysis' if region_analysis else mo
         motorcycles = [item for item in vehicle_detections if item["raw_class"] == "Two-wheeler"]
         detections = []
         for item in vehicle_detections:
-            if point_region(item, region_mask) == 0 and item["raw_class"] == "Two-wheeler":
+            item_region = point_region(item, region_mask)
+            if item_region in {1, 2, 3}:
+                item["behavior"] = "Normal vehicle behavior"
+                item["analysis"] = "vehicle in road-related region"
+                detections.append(item)
+            elif item_region == 0 and item["raw_class"] == "Two-wheeler":
+                item["behavior"] = "Abnormal behavior"
                 item["analysis"] = "motorcycle in background"
                 detections.append(item)
+            elif item_region == -1:
+                item["behavior"] = "Abnormal behavior"
+                item["analysis"] = "motorcycle/vehicle touches unknown bottom border"
             else:
-                item["analysis"] = "excluded: not a background motorcycle"
+                item["behavior"] = "Abnormal behavior"
+                item["analysis"] = "vehicle in background region"
         for item in person_detections:
-            region = point_region(item, region_mask)
+            region = pedestrian_region(item, region_mask)
             if region in {1, 2, 3} and not any(overlaps_detection(item, motorcycle) for motorcycle in motorcycles):
+                item["behavior"] = "Abnormal behavior"
                 item["analysis"] = "pedestrian in road region, not in motorcycle"
                 detections.append(item)
             elif region == 0:
+                item["behavior"] = "Normal pedestrian behavior"
                 item["analysis"] = "pedestrian in background region"
                 detections.append(item)
             elif region in {1, 2, 3}:
-                item["analysis"] = "excluded: overlaps motorcycle in road region"
+                item["behavior"] = "Normal vehicle behavior"
+                item["analysis"] = "person associated with motorcycle; excluded from pedestrian count"
             else:
-                item["analysis"] = "excluded: region not selected"
+                item["behavior"] = "Abnormal behavior"
+                item["analysis"] = "pedestrian in unknown region"
         # Show raw detections from both models, while `detections` remains the
         # filtered set used for the analysis count.
         display_detections = vehicle_detections + person_detections
@@ -433,6 +503,7 @@ with right:
             "class": detection["group"] if show_grouped else detection["raw_class"],
             "original_class": detection["raw_class"],
             "analysis": detection.get("analysis", "unfiltered model detection"),
+            "behavior": detection.get("behavior", "Unclassified"),
             "included_for_analysis": id(detection) in included_ids,
             "confidence": round(detection["confidence"], 3),
             "x1": round(box[0], 1), "y1": round(box[1], 1),
@@ -441,6 +512,11 @@ with right:
     st.metric("Included for analysis", len(detections))
     if run_combined:
         st.caption(f"Displaying all model detections: {len(display_detections or [])}. Excluded detections remain visible for verification.")
+        behavior_values = [item.get("behavior", "Unclassified") for item in (display_detections or [])]
+        normal_vehicle, normal_pedestrian, abnormal = st.columns(3)
+        normal_vehicle.metric("Normal vehicle behavior", behavior_values.count("Normal vehicle behavior"))
+        normal_pedestrian.metric("Normal pedestrian behavior", behavior_values.count("Normal pedestrian behavior"))
+        abnormal.metric("Abnormal behavior", behavior_values.count("Abnormal behavior"))
     if records:
         table = pd.DataFrame(records).sort_values("confidence", ascending=False)
         st.dataframe(table, hide_index=True, use_container_width=True)
