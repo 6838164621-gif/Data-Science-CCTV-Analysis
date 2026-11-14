@@ -1,0 +1,9 @@
+streamlit>=1.50,<2
+altair>=5,<7
+pandas>=2.2,<4
+pillow>=10,<14
+numpy>=1.26,<3
+opencv-python>=4.8,<6
+torch
+torchvision
+ultralytics>=8.4,<9
