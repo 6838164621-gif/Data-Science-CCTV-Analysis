@@ -1,0 +1,2 @@
+﻿camera_id,source_dataset,record_id,distance_m,date_start,date_end,source_url,matching_confidence
+569,sports_events.csv,rws-2026-08-29,167.9,2026-08-29,2026-08-29,https://muaytix.com/rws/fight-card,geographic/date overlap; contextual only

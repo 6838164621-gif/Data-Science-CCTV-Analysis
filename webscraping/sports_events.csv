@@ -1,0 +1,2 @@
+﻿sports_event_id,event_name,sport,venue,address,event_date,start_time,end_time,venue_latitude,venue_longitude,source_url,verification_status
+rws-2026-08-29,Rajadamnern World Series (RWS),Muay Thai,Rajadamnern Stadium,"1 Ratchadamnoen Nok Road, Bangkok",2026-08-29,19:10,,13.7610018,100.5087556,https://muaytix.com/rws/fight-card,verified_official_dated_archive_end_time_unknown

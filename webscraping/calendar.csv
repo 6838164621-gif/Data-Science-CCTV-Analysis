@@ -1,0 +1,8 @@
+﻿date,day_of_week,is_weekend,is_public_holiday,holiday_name,holiday_source,source_url
+2026-08-25,Tuesday,False,False,,,https://www.bot.or.th/en/financial-institutions-holiday.html
+2026-08-26,Wednesday,False,False,,,https://www.bot.or.th/en/financial-institutions-holiday.html
+2026-08-27,Thursday,False,False,,,https://www.bot.or.th/en/financial-institutions-holiday.html
+2026-08-28,Friday,False,False,,,https://www.bot.or.th/en/financial-institutions-holiday.html
+2026-08-29,Saturday,True,False,,,https://www.bot.or.th/en/financial-institutions-holiday.html
+2026-08-30,Sunday,True,False,,,https://www.bot.or.th/en/financial-institutions-holiday.html
+2026-08-31,Monday,False,False,,,https://www.bot.or.th/en/financial-institutions-holiday.html

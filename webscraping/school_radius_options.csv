@@ -1,0 +1,6 @@
+﻿radius_m,cameras_with_at_least_one_calendar_school,additional_cameras_vs_previous_radius,school_identities_within_radius,additional_school_identities_vs_previous_radius,camera_school_pairs
+500,0,0,0,0,0
+1000,0,0,0,0,0
+2000,4,4,1,1,4
+5000,35,31,3,2,36
+10000,96,61,4,1,182
